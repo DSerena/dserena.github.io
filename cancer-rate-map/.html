@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>US Cancer Rates</title>
+    
+    <style>
+        h1{ margin-left: 100px;
+            margin-right: 100px;
+            margin-top: 50px;
+            
+        }
+        
+        div.tooltip {	
+    position: absolute;			
+    text-align: center;			
+    width: 120px;					
+    transform: translate(-50%, -100%);					
+    padding: 2px;				
+    font: 12px sans-serif;		
+    background: lightsteelblue;	
+    border: 0px;		
+    border-radius: 3px;			
+    pointer-events: none;			
+}
+
+    </style>
+</head>
+<body>
+    <h1>US Cancer Rates</h1>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://unpkg.com/topojson@3"></script>
+<script>
+
+var svg = d3.select("body")
+    .append("svg")
+    .attr("width", 860)
+    .attr("height", 600);
+
+var projection = d3.geoAlbers()
+    .translate([450,0])
+    .scale(1000);
+
+var path = d3.geoPath()
+    .projection(projection);
+
+  
+Promise.all([
+  d3.json("states.json"), 
+  d3.csv("Cancer_states.csv") 
+])
+.then(function(data){
+    
+    var center = d3.geoCentroid(data[0]);
+    
+    var my_map = d3.map();
+
+    data[1].forEach(function(d){
+
+        d["Cases per 100,000"] = +d["Cases per 100,000"];
+        my_map.set(d["Area"], d["Cases per 100,000"]);
+    });
+    
+    var colorScale = d3.scaleSequential(d3.interpolateBlues)
+      .domain([d3.min(data[1], function(d){ return d["Cases per 100,000"]; }), d3.max(data[1], function(d){ return d["Cases per 100,000"]; })]);
+    
+  
+    var div = d3.select("body").append("div")
+        .attr("class","tooltip")
+        .style("opacity",0);
+    
+    
+    svg.selectAll("path")
+        .data(topojson.feature(data[0], data[0].objects.states).features.filter(function(d){ return d.properties.ST_NAME != "Alaska" && d.properties.ST_NAME != "Hawaii"}))
+        .enter()
+        .append("path")
+        .attr("d", path)
+        .attr("data-statename", function(d){ return d.properties.ST_NAME; })
+        .attr("stroke", "#000000")
+        .attr("fill", function(d){
+            return colorScale(my_map.get(d.properties.ST_NAME));
+        })
+        .on("mouseover", function(d){
+        
+            console.log(d)
+            var cancerRate = my_map.get(d.properties.ST_NAME);
+    
+            var stateName = d.properties.ST_NAME;
+        
+            var info = "<p>" + "<strong>"+ stateName + "</strong>" + "<br>"+ cancerRate + "</p>";
+        
+            div.transition()		
+                .duration(200)		
+                .style("opacity", .9);		
+            div	.html(info)	
+                .style("left", (d3.event.pageX) + "px")		
+                .style("top", (d3.event.pageY - 28) + "px");
+        })
+         .on("mouseout", function(d) {		
+            div.transition()		
+                .duration(500)		
+                .style("opacity", 0);	
+    })
+});
+  
+</script>
+    
+    <p>Cancer Rates in terms of cases/100,000</p>
+</body>
+</html>
